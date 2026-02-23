@@ -3,9 +3,22 @@ import axios from 'axios'
 
 function safeStr(v) { return String(v ?? '').trim() }
 
+// ✅ si env contient "VITE_API_URL=https://..." on extrait l’URL
+function sanitizeApiBase(raw) {
+  const s = safeStr(raw)
+  if (!s) return ''
+  const m = s.match(/^(?:VITE_API_URL|VITE_API_BASE_URL)\s*=\s*(https?:\/\/.+)$/i)
+  if (m) return safeStr(m[1]).replace(/\/+$/, '')
+  return s.replace(/\/+$/, '')
+}
+
+const API_BASE =
+  sanitizeApiBase(import.meta.env.VITE_API_URL) ||
+  sanitizeApiBase(import.meta.env.VITE_API_BASE_URL) ||
+  'https://digi-337307224016.europe-west1.run.app/api'
+
 export const http = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://digi-337307224016.europe-west1.run.app/api',
-  // ✅ si un jour tu passes auth cookies, laisse ça prêt
+  baseURL: API_BASE,
   // withCredentials: true,
 })
 
@@ -50,7 +63,6 @@ function isFormDataPayload(data) {
 function deleteContentTypeEverywhere(headers) {
   if (!headers) return
   try {
-    // axios peut avoir headers comme object, ou AxiosHeaders-like
     if (typeof headers.delete === 'function') {
       headers.delete('Content-Type')
       headers.delete('content-type')
@@ -59,8 +71,6 @@ function deleteContentTypeEverywhere(headers) {
   } catch {
     // ignore
   }
-
-  // object classique
   delete headers['Content-Type']
   delete headers['content-type']
 }
@@ -71,13 +81,8 @@ http.interceptors.request.use((config) => {
 
   config.headers = config.headers || {}
 
-  // ✅ IMPORTANT: si multipart/form-data, ne JAMAIS fixer Content-Type ici
-  // => on supprime toutes les variantes possibles
   if (isFormDataPayload(config.data)) {
     deleteContentTypeEverywhere(config.headers)
-
-    // ⚠️ certains projets ont aussi un default global
-    // on neutralise si quelqu’un a fait http.defaults.headers.common['Content-Type']=...
     try {
       deleteContentTypeEverywhere(http.defaults?.headers?.common)
       deleteContentTypeEverywhere(http.defaults?.headers)
@@ -99,10 +104,6 @@ http.interceptors.request.use((config) => {
   return config
 })
 
-/**
- * ✅ NEW: permet de récupérer le token EXACTEMENT comme Axios le fait,
- * pour construire des URLs (iframe/window.open) qui ne peuvent pas envoyer les headers.
- */
 export function getResolvedAuthToken() {
   const t =
     safeStr(tokenGetter?.()) ||
