@@ -9,7 +9,7 @@ function safeStr(v) { return String(v ?? '').trim() }
 function getApiBase() {
   const v1 = safeStr(import.meta?.env?.VITE_API_URL)
   const v2 = safeStr(import.meta?.env?.VITE_API_BASE_URL)
-  return v1 || v2 || 'VITE_API_URL=https://digi-337307224016.europe-west1.run.app/api'
+  return v1 || v2 || 'https://digi-337307224016.europe-west1.run.app/api'
 }
 
 function splitOriginAndPrefix() {

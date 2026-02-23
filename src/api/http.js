@@ -4,7 +4,7 @@ import axios from 'axios'
 function safeStr(v) { return String(v ?? '').trim() }
 
 export const http = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'VITE_API_URL=https://digi-337307224016.europe-west1.run.app/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://digi-337307224016.europe-west1.run.app/api',
   // ✅ si un jour tu passes auth cookies, laisse ça prêt
   // withCredentials: true,
 })
