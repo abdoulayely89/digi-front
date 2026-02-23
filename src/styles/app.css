@@ -1,0 +1,66 @@
+:root{
+  --bg: #F7F8FB;
+  --panel: #FFFFFF;
+  --panelBorder: rgba(15, 23, 42, 0.10);
+  --text: #0F172A;
+  --muted: #475569;
+  --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  --soft: rgba(249,115,22,0.10); /* corail soft */
+}
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+a { color: inherit; }
+
+.ant-typography, .ant-table-cell {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Cards */
+.ds-card {
+  background: var(--panel) !important;
+  border: 1px solid var(--panelBorder) !important;
+  border-radius: 16px !important;
+  box-shadow: var(--shadow);
+}
+
+.ds-muted { color: var(--muted) !important; }
+
+.ds-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+@media (min-width: 992px) { .ds-page { padding: 24px; } }
+
+/* Tables (lisibles) */
+.ds-card .ant-table,
+.ds-card .ant-table-container {
+  background: transparent !important;
+}
+.ds-card .ant-table-thead > tr > th{
+  background: #F8FAFC !important;
+  color: var(--text) !important;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08) !important;
+}
+.ds-card .ant-table-tbody > tr > td{
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06) !important;
+}
+.ds-card .ant-table-tbody > tr.ant-table-row:hover > td{
+  background: #F8FAFC !important;
+}
+
+/* Boutons texte dans le Header (si tu gardes type="text") */
+.ant-btn.ant-btn-text {
+  color: var(--text);
+}
+.ant-btn.ant-btn-text:hover {
+  background: rgba(15,23,42,0.05);
+}

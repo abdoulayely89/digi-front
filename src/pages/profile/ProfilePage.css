@@ -1,0 +1,437 @@
+/* src/pages/profile/ProfilePage.css */
+
+/* =========================================================
+   0) SCOPE + Anti vertical (robuste desktop)
+   ========================================================= */
+
+   .profilePage,
+   .profilePage__scope {
+     width: 100%;
+     writing-mode: horizontal-tb !important;
+     text-orientation: mixed !important;
+     direction: ltr;
+     unicode-bidi: plaintext;
+   }
+   
+   /* Force horizontal sur TOUS les descendants (indispensable si un @media min-width remet vertical) */
+   .profilePage__scope,
+   .profilePage__scope * {
+     writing-mode: horizontal-tb !important;
+     text-orientation: mixed !important;
+   }
+   
+   /* Ne casse pas AntD: on ne neutralise transform QUE sur les éléments textuels */
+   .profilePage__scope :is(
+     p, span, a, div, li, td, th, label,
+     h1, h2, h3, h4, h5, h6,
+     small, strong, em, code, pre
+   ) {
+     transform: none !important;
+     direction: ltr;
+     unicode-bidi: plaintext;
+   }
+   
+   /* Wrap global anti-débordement (surtout URLs) */
+   .profilePage__scope :is(
+     p, span, a, div, li, td, th, label,
+     h1, h2, h3, h4, h5, h6,
+     small, strong, em, code, pre
+   ) {
+     white-space: normal !important;
+     overflow-wrap: anywhere !important;
+     word-break: break-word !important;
+     line-height: 1.45 !important;
+     hyphens: auto;
+   }
+   
+   /* =========================================================
+      1) Container / background
+      ========================================================= */
+   
+   .profilePage {
+     min-height: 100vh;
+     background:
+       radial-gradient(1100px 600px at 20% -10%, rgba(24, 144, 255, 0.10), transparent 60%),
+       radial-gradient(900px 500px at 90% 10%, rgba(82, 196, 26, 0.08), transparent 55%),
+       linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.00));
+   }
+   
+   .profilePage__scope {
+     max-width: 1180px;
+     margin: 0 auto;
+     padding: 18px;
+   }
+   
+   /* utilitaire utilisé dans JSX */
+   .profileTextWrap {
+     min-width: 0 !important;
+     white-space: normal !important;
+     overflow-wrap: anywhere !important;
+     word-break: break-word !important;
+     line-height: 1.45 !important;
+     hyphens: auto;
+   }
+   
+   /* =========================================================
+      2) Cards
+      ========================================================= */
+   
+   .ppCard {
+     border-radius: 20px !important;
+     border: 1px solid rgba(0, 0, 0, 0.06) !important;
+     overflow: hidden;
+     box-shadow:
+       0 10px 30px rgba(0, 0, 0, 0.06),
+       0 2px 10px rgba(0, 0, 0, 0.04);
+     background: rgba(255, 255, 255, 0.78) !important;
+     backdrop-filter: blur(10px);
+   }
+   
+   .ppCard .ant-card-body {
+     min-width: 0;
+   }
+   
+   .ppInner {
+     border-radius: 16px !important;
+     border: 1px solid rgba(0, 0, 0, 0.06) !important;
+     background: rgba(255, 255, 255, 0.55) !important;
+   }
+   
+   .ppInner .ant-card-head {
+     border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+   }
+   
+   .ppInnerTitle {
+     font-weight: 900;
+     letter-spacing: -0.2px;
+   }
+   
+   /* =========================================================
+      3) Header
+      ========================================================= */
+   
+   .ppHeader {
+     display: flex;
+     align-items: flex-start;
+     justify-content: space-between;
+     gap: 14px;
+     flex-wrap: wrap;
+     min-width: 0;
+   }
+   
+   .ppBrand {
+     display: flex;
+     align-items: center;
+     gap: 12px;
+     min-width: 0;
+     flex: 1 1 auto;
+   }
+   
+   .ppLogoBox {
+     width: 52px;
+     height: 52px;
+     border-radius: 16px;
+     border: 1px solid rgba(0, 0, 0, 0.08);
+     background: rgba(255,255,255,0.92);
+     display: grid;
+     place-items: center;
+     overflow: hidden;
+     flex: 0 0 auto;
+     box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+   }
+   
+   .ppLogoImg {
+     width: 82%;
+     height: 82%;
+     object-fit: contain;
+     display: block;
+   }
+   
+   .ppBrandText {
+     min-width: 0;
+     flex: 1 1 auto;
+   }
+   
+   .ppBrandName {
+     font-weight: 950;
+     font-size: 16px;
+     line-height: 1.2;
+     letter-spacing: -0.2px;
+   }
+   
+   .ppBrandSub {
+     opacity: 0.72;
+     font-size: 12px;
+     line-height: 1.2;
+   }
+   
+   /* =========================================================
+      4) Identity
+      ========================================================= */
+   
+   .ppIdentity {
+     display: flex;
+     align-items: center;
+     gap: 14px;
+     min-width: 0;
+   }
+   
+   .ppAvatar {
+     background: rgba(0, 0, 0, 0.06) !important;
+     border: 1px solid rgba(0, 0, 0, 0.06);
+     flex: 0 0 auto;
+   }
+   
+   .ppIdentityText {
+     min-width: 0;
+     flex: 1 1 auto;
+   }
+   
+   .ppPersonName {
+     font-size: clamp(20px, 2.2vw, 26px);
+     font-weight: 950;
+     line-height: 1.1;
+     letter-spacing: -0.4px;
+   }
+   
+   .ppPersonTitle {
+     opacity: 0.82;
+     margin-top: 4px;
+     line-height: 1.25;
+   }
+   
+   .ppChips {
+     display: flex;
+     flex-wrap: wrap;
+     gap: 8px;
+     margin-top: 10px;
+     min-width: 0;
+   }
+   
+   .ppChip {
+     display: inline-flex;
+     align-items: center;
+     max-width: 100%;
+     padding: 6px 10px;
+     border-radius: 999px;
+     border: 1px solid rgba(0, 0, 0, 0.08);
+     background: rgba(255, 255, 255, 0.65);
+     font-size: 12px;
+     min-width: 0;
+   }
+   
+   .ppChipWarn {
+     border-color: rgba(245, 158, 11, 0.30);
+     background: rgba(245, 158, 11, 0.10);
+   }
+   
+   /* =========================================================
+      5) Actions
+      ========================================================= */
+   
+   .ppActions {
+     display: flex;
+     flex-wrap: wrap;
+     gap: 10px;
+     margin-top: 12px;
+   }
+   
+   .ppActions .ant-btn {
+     border-radius: 12px !important;
+     height: 38px;
+     padding-inline: 14px;
+     max-width: 100%;
+   }
+   
+   .ppActions .ant-btn-primary {
+     box-shadow: 0 10px 20px rgba(24, 144, 255, 0.16);
+   }
+   
+   /* Evite texte de bouton qui se met en colonne */
+   .ppActions .ant-btn > span {
+     white-space: normal !important;
+     overflow-wrap: anywhere !important;
+     word-break: break-word !important;
+   }
+   
+   /* =========================================================
+      6) Info rows
+      ========================================================= */
+   
+   .ppSectionHint {
+     font-size: 12px;
+     font-weight: 900;
+     opacity: 0.75;
+     margin-bottom: 8px;
+     text-transform: uppercase;
+     letter-spacing: 0.6px;
+   }
+   
+   .ppBlock {
+     display: grid;
+     gap: 10px;
+     min-width: 0;
+   }
+   
+   .ppRow {
+     display: grid;
+     grid-template-columns: 155px minmax(0, 1fr);
+     column-gap: 12px;
+     row-gap: 2px;
+     align-items: baseline;
+     min-width: 0;
+   }
+   
+   .ppLabel {
+     font-size: 12px;
+     opacity: 0.70;
+     white-space: nowrap;
+     overflow: hidden;
+     text-overflow: ellipsis;
+     min-width: 0;
+   }
+   
+   .ppValue {
+     min-width: 0;
+   }
+   
+   .ppLink {
+     text-decoration: none;
+     overflow-wrap: anywhere;
+     word-break: break-word;
+   }
+   
+   .ppLink:hover {
+     text-decoration: underline;
+   }
+   
+   /* Bio / code / empty */
+   .ppBio {
+     padding: 12px;
+     border-radius: 14px;
+     border: 1px solid rgba(0, 0, 0, 0.06);
+     background: rgba(0, 0, 0, 0.02);
+     white-space: pre-wrap;
+     line-height: 1.55;
+     overflow-wrap: anywhere;
+     word-break: break-word;
+   }
+   
+   .ppCode {
+     padding: 12px;
+     border-radius: 14px;
+     border: 1px dashed rgba(0, 0, 0, 0.18);
+     background: rgba(0, 0, 0, 0.02);
+     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+       monospace;
+     font-size: 12px;
+     line-height: 1.45;
+     overflow-wrap: anywhere;
+     word-break: break-word;
+   }
+   
+   .ppEmpty {
+     padding: 12px;
+     border-radius: 14px;
+     border: 1px dashed rgba(0, 0, 0, 0.12);
+     background: rgba(0, 0, 0, 0.01);
+   }
+   
+   /* =========================================================
+      7) List
+      ========================================================= */
+   
+   .ppListItem {
+     padding: 12px !important;
+     align-items: flex-start !important;
+   }
+   
+   .ppListItem:hover {
+     background: rgba(0, 0, 0, 0.02);
+   }
+   
+   .ppListItem .ant-list-item-meta,
+   .ppListItem .ant-list-item-meta-content {
+     min-width: 0;
+   }
+   
+   .ppListTitle {
+     font-weight: 900;
+     letter-spacing: -0.2px;
+   }
+   
+   .ppListDesc {
+     display: block;
+     opacity: 0.75;
+   }
+   
+   .ppOpen {
+     text-decoration: none;
+     white-space: nowrap;
+     font-weight: 700;
+   }
+   
+   /* =========================================================
+      8) QR
+      ========================================================= */
+   
+   .ppQrBox {
+     background: rgba(255,255,255,0.92);
+     padding: 14px;
+     border-radius: 18px;
+     border: 1px solid rgba(0, 0, 0, 0.06);
+     box-shadow: 0 10px 24px rgba(0,0,0,0.06);
+     max-width: 100%;
+   }
+   
+   /* =========================================================
+      9) Divider soft
+      ========================================================= */
+   
+   .ppDivider {
+     margin: 16px 0 !important;
+     border-color: rgba(0,0,0,0.06) !important;
+   }
+   
+   /* =========================================================
+      10) AntD text safety (tags/typography)
+      ========================================================= */
+   
+   .profilePage__scope :is(.ant-typography, .ant-tag, .ant-btn, .ant-list-item-meta-title, .ant-list-item-meta-description) {
+     writing-mode: horizontal-tb !important;
+     text-orientation: mixed !important;
+     white-space: normal !important;
+     overflow-wrap: anywhere !important;
+     word-break: break-word !important;
+   }
+   
+   /* =========================================================
+      11) Mobile
+      ========================================================= */
+   
+   @media (max-width: 576px) {
+     .profilePage__scope {
+       padding: 12px;
+     }
+   
+     /* actions en full width */
+     .ppActions {
+       display: grid;
+       grid-template-columns: 1fr;
+       gap: 10px;
+     }
+   
+     .ppActions .ant-btn {
+       width: 100%;
+       height: 40px;
+     }
+   
+     .ppRow {
+       grid-template-columns: 1fr;
+       row-gap: 6px;
+     }
+   
+     .ppLabel {
+       white-space: normal;
+     }
+   }
