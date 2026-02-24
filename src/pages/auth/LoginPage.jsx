@@ -1,10 +1,13 @@
+// src/pages/auth/LoginPage.jsx
 import React, { useContext, useState } from 'react'
-import { App as AntApp, Button, Card, Form, Input, Space, Typography } from 'antd'
+import { App as AntApp, Button, Card, Form, Input, Space, Typography, Alert } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../../context/AuthContext'
 import { api } from '../../api/api'
 
 const { Title, Text } = Typography
+
+function safeStr(v) { return String(v ?? '').trim() }
 
 export default function LoginPage() {
   const { message } = AntApp.useApp()
@@ -15,9 +18,21 @@ export default function LoginPage() {
   async function onFinish(values) {
     setLoading(true)
     try {
-      const data = await api.auth.login(values)
+      // ✅ superadmin: tenantSlug optionnel -> si vide, on ne l’envoie pas
+      const payload = {
+        email: safeStr(values?.email),
+        password: safeStr(values?.password),
+      }
+      const ts = safeStr(values?.tenantSlug)
+      if (ts) payload.tenantSlug = ts
+
+      const data = await api.auth.login(payload)
       setAuthSession(data)
-      navigate('/dashboard')
+
+      // ✅ superadmin peut aller direct au bootstrap
+      const role = String(data?.user?.role || '').toLowerCase()
+      if (role === 'superadmin') navigate('/admin/bootstrap')
+      else navigate('/dashboard')
     } catch (e) {
       message.error(e?.response?.data?.message || 'Connexion impossible')
     } finally {
@@ -70,17 +85,24 @@ export default function LoginPage() {
           }}
           bodyStyle={{ padding: 28 }}
         >
-          <Title level={4} style={{ marginTop: 0, marginBottom: 18, color: 'var(--text)' }}>
+          <Title level={4} style={{ marginTop: 0, marginBottom: 12, color: 'var(--text)' }}>
             Connexion
           </Title>
+
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 14 }}
+            message="Superadmin : laisse le champ “Entreprise (slug)” vide."
+          />
 
           <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
             <Form.Item
               label={<span style={{ color: 'var(--muted)' }}>Entreprise (slug)</span>}
               name="tenantSlug"
-              rules={[{ required: true, message: 'Saisis le slug de l’entreprise' }]}
+              rules={[{ required: false }]}
             >
-              <Input placeholder="ex: pma-ci" autoComplete="organization" />
+              <Input placeholder="ex: pma-ci (laisser vide si superadmin)" autoComplete="organization" />
             </Form.Item>
 
             <Form.Item

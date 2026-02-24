@@ -1,5 +1,6 @@
+// src/router/AppRouter.jsx
 import React from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import PrivateRoute from './PrivateRoute'
 import AppLayout from '../ui/layout/AppLayout'
 
@@ -24,6 +25,10 @@ import ProfilePage from '../pages/profile/ProfilePage'
 import MyLocationPage from '../pages/tracking/MyLocationPage'
 import TeamLocationsPage from '../pages/tracking/TeamLocationsPage'
 
+// ✅ NEW: superadmin bootstrap (tenants + admins)
+import TenantBootstrapPage from '../pages/admin/TenantBootstrapPage'
+import RequireRole from '../ui/components/RequireRole'
+
 export default function AppRouter() {
   return (
     <BrowserRouter>
@@ -35,6 +40,9 @@ export default function AppRouter() {
 
         {/* Auth */}
         <Route path="/login" element={<LoginPage />} />
+
+        {/* Compat: si quelqu’un va sur /auth/login */}
+        <Route path="/auth/login" element={<Navigate to="/login" replace />} />
 
         {/* Private */}
         <Route
@@ -48,6 +56,17 @@ export default function AppRouter() {
           <Route index element={<SalesDashboard />} />
           <Route path="dashboard" element={<SalesDashboard />} />
           <Route path="admin" element={<AdminDashboard />} />
+
+          {/* ✅ NEW: superadmin only */}
+          <Route
+            path="admin/bootstrap"
+            element={
+              <RequireRole roles={['superadmin']}>
+                <TenantBootstrapPage />
+              </RequireRole>
+            }
+          />
+
           <Route path="leads" element={<LeadsPage />} />
           <Route path="quotes" element={<QuotesPage />} />
           <Route path="contracts" element={<ContractsPage />} />

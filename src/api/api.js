@@ -371,9 +371,22 @@ export const api = {
         const doc = data?.contract || data
         return normalizeContract(doc)
       },
-      // ✅ lien public stable vers endpoint backend (qui redirige 302 vers signedUrl)
       openPdfUrl(tenantSlug, token) {
         return apiAssetUrl(`/contracts/public/t/${encodeURIComponent(tenantSlug)}/c/${encodeURIComponent(token)}/pdf/open`)
+      },
+    },
+  },
+
+  // ✅ NEW: SUPERADMIN (bootstrap tenants + admins)
+  admin: {
+    tenants: {
+      async upsert(payload) {
+        const { data } = await http.post('/admin/tenants', payload)
+        return data
+      },
+      async upsertAdmin(tenantId, payload) {
+        const { data } = await http.post(`/admin/tenants/${encodeURIComponent(tenantId)}/admin`, payload)
+        return data
       },
     },
   },
