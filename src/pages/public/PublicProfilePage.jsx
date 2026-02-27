@@ -354,6 +354,9 @@ export default function PublicProfilePage() {
     return list
   }, [p])
 
+  // ✅ vCard:
+  // - desktop: download (attachment)
+  // - mobile: inline (meilleur comportement "Ajouter au contact")
   const vcardHref = useMemo(() => {
     if (!tenantSlug || !userSlug) return ''
     try {
@@ -362,6 +365,14 @@ export default function PublicProfilePage() {
       return apiAssetUrl(`/public/t/${encodeURIComponent(tenantSlug)}/u/${encodeURIComponent(userSlug)}/vcard`)
     }
   }, [tenantSlug, userSlug])
+
+  const vcardHrefInline = useMemo(() => {
+    const base = safeStr(vcardHref)
+    if (!base) return ''
+    const sep = base.includes('?') ? '&' : '?'
+    // mode=inline + download=0 (renforce sur certains navigateurs)
+    return `${base}${sep}mode=inline&download=0`
+  }, [vcardHref])
 
   const containerStyle = {
     minHeight: '100vh',
@@ -412,10 +423,12 @@ export default function PublicProfilePage() {
           <div><b>user._id</b>: {safeStr(user?._id || user?.id) || '—'}</div>
           <div><b>user.profile.avatarSignedUrl</b>: {safeStr(user?.profile?.avatarSignedUrl) || '—'}</div>
           <div><b>tenant.logoUrl</b>: {safeStr(tenant?.logoUrl || tenant?.branding?.logoUrl) || '—'}</div>
+          <div><b>vcard.download</b>: {safeStr(vcardHref) || '—'}</div>
+          <div><b>vcard.inline</b>: {safeStr(vcardHrefInline) || '—'}</div>
         </div>
       </div>
     )
-  }, [debug, tenantSlug, userSlug, avatarResolved, avatarUrl, user, tenant])
+  }, [debug, tenantSlug, userSlug, avatarResolved, avatarUrl, user, tenant, vcardHref, vcardHrefInline])
 
   return (
     <div style={containerStyle}>
@@ -583,7 +596,16 @@ export default function PublicProfilePage() {
                       icon={<IdcardOutlined />}
                       onClick={() => {
                         if (!vcardHref) return message.error('vCard indisponible')
-                        try { window.location.assign(vcardHref) } catch { window.open(vcardHref, '_blank', 'noopener,noreferrer') }
+
+                        const targetUrl = isMobile ? vcardHrefInline : vcardHref
+
+                        try {
+                          // iOS/Safari: location.assign marche mieux pour inline
+                          window.location.assign(targetUrl)
+                        } catch {
+                          const w = window.open(targetUrl, '_blank', 'noopener,noreferrer')
+                          if (!w) message.warning('Pop-up bloquée : autorise les pop-ups pour ouvrir la vCard')
+                        }
                       }}
                       style={actionBtnStyle}
                       disabled={!vcardHref}
