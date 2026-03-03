@@ -1,5 +1,5 @@
 // src/pages/invoices/InvoicesPage.jsx
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useContext, useEffect, useMemo, useState } from 'react'
 import {
   App as AntApp,
   Button,
@@ -37,6 +37,7 @@ import dayjs from 'dayjs'
 
 import PageFrame from '../../ui/components/PageFrame'
 import { api } from '../../api/api'
+import { AuthContext } from '../../context/AuthContext'
 
 const { Title, Text } = Typography
 const { useBreakpoint } = Grid
@@ -80,10 +81,6 @@ function openUrl(u) {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-function getAuthToken() {
-  return safeStr(localStorage.getItem('token')) || safeStr(sessionStorage.getItem('token')) || ''
-}
-
 /**
  * ✅ IMPORTANT (anti ExpiredToken)
  * On ouvre toujours le PDF via l’endpoint backend:
@@ -102,6 +99,9 @@ export default function InvoicesPage() {
   const screens = useBreakpoint()
   const isMobile = !screens?.md
 
+  const auth = useContext(AuthContext)
+  const hasAuth = !!auth?.token && !!auth?.isAuthed
+
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState([])
 
@@ -114,8 +114,6 @@ export default function InvoicesPage() {
 
   const [contractsLoading, setContractsLoading] = useState(false)
   const [contracts, setContracts] = useState([])
-
-  const hasAuth = useMemo(() => !!getAuthToken(), [])
 
   // Anti “vertical text”
   const noVerticalText = {
@@ -295,6 +293,12 @@ export default function InvoicesPage() {
       if (stable) openUrl(stable)
     } catch (e) {
       if (e?.errorFields) return
+
+      const status = e?.response?.status
+      if (status === 401 || status === 403) {
+        return message.error("Non autorisé. Connecte-toi pour créer des factures.")
+      }
+
       message.error(e?.response?.data?.error || e?.message || 'Création facture impossible')
     } finally {
       setActionLoading(false)
@@ -308,7 +312,6 @@ export default function InvoicesPage() {
     try {
       await api.invoices.generatePdf(id)
       message.success('PDF généré')
-      // ✅ ouverture stable
       openUrl(openInvoicePdfUrl({ _id: id }))
       await loadInvoices()
     } catch (e) {
@@ -326,7 +329,6 @@ export default function InvoicesPage() {
       if (!api?.invoices?.send) return message.error("api.invoices.send(...) n'existe pas dans src/api/api.js")
       await api.invoices.send(id, {})
       message.success('Email envoyé')
-      // ✅ ouverture stable
       openUrl(openInvoicePdfUrl({ _id: id }))
       await loadInvoices()
     } catch (e) {
@@ -676,7 +678,6 @@ export default function InvoicesPage() {
                     type="primary"
                     icon={<PlusOutlined />}
                     onClick={onOpenCreate}
-                    disabled={!hasAuth}
                     style={{ borderRadius: 14 }}
                   >
                     Nouvelle facture
@@ -714,7 +715,7 @@ export default function InvoicesPage() {
               showIcon
               style={{ borderRadius: 14 }}
               message="Authentification"
-              description="Aucun token détecté. Connecte-toi pour créer / envoyer des factures."
+              description="Session inactive (ds_token/ds_user manquants). Connecte-toi pour créer / envoyer des factures."
             />
           ) : null}
 
@@ -746,7 +747,6 @@ export default function InvoicesPage() {
                           type="primary"
                           icon={<PlusOutlined />}
                           onClick={onOpenCreate}
-                          disabled={!hasAuth}
                           style={{ borderRadius: 14 }}
                         >
                           Nouvelle facture
@@ -789,7 +789,7 @@ export default function InvoicesPage() {
                 type="warning"
                 showIcon
                 style={{ marginBottom: 12, borderRadius: 14 }}
-                message="Token manquant"
+                message="Non connecté"
                 description="Connecte-toi pour créer une facture."
               />
             ) : (
@@ -827,7 +827,6 @@ export default function InvoicesPage() {
                       if (open && !contracts?.length) loadContractsForPicker()
                     }}
                     onChange={onContractChange}
-                    disabled={!hasAuth}
                   />
                 </Form.Item>
 

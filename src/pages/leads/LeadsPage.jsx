@@ -82,6 +82,29 @@ function toDayjsOrNull(d) {
   return x.isValid() ? x : null
 }
 
+// Petit helper: merge shallow + contact
+function mergeLead(oldLead, patchLead) {
+  if (!oldLead) return patchLead
+  if (!patchLead) return oldLead
+  const a = oldLead || {}
+  const b = patchLead || {}
+  return {
+    ...a,
+    ...b,
+    contact: { ...(a.contact || {}), ...(b.contact || {}) },
+  }
+}
+
+function isWarmingUpError(e) {
+  const st = e?.response?.status
+  const msg = safeStr(e?.response?.data?.error || e?.response?.data?.message || e?.message)
+  return st === 503 || msg.toLowerCase().includes('warming') || msg.toLowerCase().includes('not ready') || msg.toLowerCase().includes('db_not_ready')
+}
+
+async function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
 export default function LeadsPage() {
   const screens = useBreakpoint()
   const isMobile = !screens?.md
@@ -108,6 +131,9 @@ export default function LeadsPage() {
 
   // VIEW | CREATE | EDIT
   const [mode, setMode] = useState('VIEW')
+
+  // ✅ pour éviter le warning AntD: seed form APRES montage du Form
+  const [seedTick, setSeedTick] = useState(0)
 
   // Helpers anti chevauchement
   const shrink0 = { minWidth: 0 }
@@ -174,7 +200,11 @@ export default function LeadsPage() {
       setItems(list)
       setTotal(safeNum(data?.total ?? list.length))
     } catch (e) {
-      setError(e?.response?.data?.error || e?.message || 'Erreur chargement prospects')
+      if (isWarmingUpError(e)) {
+        setError('Service en démarrage (Cloud Run). Réessaie dans quelques secondes.')
+      } else {
+        setError(e?.response?.data?.error || e?.message || 'Erreur chargement prospects')
+      }
     } finally {
       setLoading(false)
     }
@@ -198,41 +228,99 @@ export default function LeadsPage() {
     })
   }
 
+  // ✅ seed après render (évite warning AntD setFieldsValue before mount)
+  useEffect(() => {
+    if (!drawerOpen) return
+    if (mode === 'CREATE') return
+    if (!selected) return
+
+    Promise.resolve().then(() => {
+      try {
+        seedFormFromLead(selected)
+      } catch (_) {
+        // noop
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawerOpen, selected, seedTick])
+
+  // ✅ fetch détail “safe” : retry léger en cas de 503/500 transient (cold start)
+  const fetchLeadFresh = useCallback(async (id, { retries = 2 } = {}) => {
+    if (!id) return null
+    let lastErr = null
+    for (let i = 0; i <= retries; i++) {
+      try {
+        const res = await api.leads.get(id)
+        return unwrap(res) || null
+      } catch (e) {
+        lastErr = e
+        const st = e?.response?.status
+        // Retry seulement sur 503/500 “transient”
+        if (st === 503 || st === 500) {
+          await sleep(350 + i * 450)
+          continue
+        }
+        throw e
+      }
+    }
+    if (lastErr) throw lastErr
+    return null
+  }, [])
+
+  // ✅ Ouvre instantanément avec le row, puis refresh en background
   const openLead = useCallback(async (row) => {
     setDrawerOpen(true)
-    setDrawerLoading(true)
-    setSelected(null)
+    setDrawerLoading(false)
+    setSelected(row || null)
     setMode('VIEW')
+    setSeedTick((x) => x + 1)
+
+    const id = row?._id
+    if (!id) return
+
+    setDrawerLoading(true)
     try {
-      const res = row?._id ? await api.leads.get(row._id) : row
-      const lead = unwrap(res) || row
-      setSelected(lead)
-      seedFormFromLead(lead)
-    } catch {
-      setSelected(row)
-      seedFormFromLead(row)
+      const fresh = await fetchLeadFresh(id, { retries: 2 })
+      if (fresh) {
+        setSelected((prev) => mergeLead(prev, fresh))
+        setSeedTick((x) => x + 1)
+      }
+    } catch (e) {
+      if (isWarmingUpError(e)) {
+        msgApi.warning('Service en démarrage: détail non rafraîchi (ok).')
+      }
     } finally {
       setDrawerLoading(false)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchLeadFresh, msgApi])
 
   const openEdit = useCallback(async (row) => {
     setDrawerOpen(true)
-    setDrawerLoading(true)
-    setSelected(null)
+    setDrawerLoading(false)
+    setSelected(row || null)
     setMode('EDIT')
+    setSeedTick((x) => x + 1)
+
+    const id = row?._id
+    if (!id) return
+
+    setDrawerLoading(true)
     try {
-      const res = row?._id ? await api.leads.get(row._id) : row
-      const lead = unwrap(res) || row
-      setSelected(lead)
-      seedFormFromLead(lead)
-    } catch {
-      setSelected(row)
-      seedFormFromLead(row)
+      const fresh = await fetchLeadFresh(id, { retries: 2 })
+      if (fresh) {
+        setSelected((prev) => mergeLead(prev, fresh))
+        setSeedTick((x) => x + 1)
+      }
+    } catch (e) {
+      if (isWarmingUpError(e)) {
+        msgApi.warning('Service en démarrage: édition ouverte avec données locales (ok).')
+      } else {
+        msgApi.warning(e?.response?.data?.error || e?.message || 'Détail non disponible (temporaire)')
+      }
     } finally {
       setDrawerLoading(false)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchLeadFresh, msgApi])
 
   const onCreate = useCallback(() => {
     setDrawerOpen(true)
@@ -266,7 +354,8 @@ export default function LeadsPage() {
       if (items.length === 1 && page > 1) setPage(page - 1)
       else load()
     } catch (e) {
-      msgApi.error(e?.response?.data?.error || e?.message || 'Suppression impossible')
+      if (isWarmingUpError(e)) msgApi.error('Service en démarrage, suppression à réessayer.')
+      else msgApi.error(e?.response?.data?.error || e?.message || 'Suppression impossible')
     }
   }, [closeDrawer, items.length, load, msgApi, page])
 
@@ -296,53 +385,109 @@ export default function LeadsPage() {
         throw new Error("api.leads.create indisponible (branche l'endpoint create)")
       }
 
-      await api.leads.create(payload)
+      const res = await api.leads.create(payload)
+      const created = unwrap(res)
+
       msgApi.success('Prospect créé')
       closeDrawer()
       setPage(1)
-      load()
+
+      if (page === 1) {
+        if (created && created._id) {
+          setItems((prev) => [created, ...(Array.isArray(prev) ? prev : [])])
+          setTotal((t) => safeNum(t) + 1)
+        } else {
+          load()
+        }
+      } else {
+        load()
+      }
     } catch (e) {
-      msgApi.error(e?.response?.data?.error || e?.message || 'Création impossible')
+      if (isWarmingUpError(e)) msgApi.error('Service en démarrage, création à réessayer.')
+      else msgApi.error(e?.response?.data?.error || e?.message || 'Création impossible')
     } finally {
       setSaving(false)
     }
-  }, [closeDrawer, load, msgApi])
+  }, [closeDrawer, load, msgApi, page])
 
   const submitEdit = useCallback(async (values) => {
+    setSaving(true)
+    const payload = buildPayloadFromForm(values)
+    const id = selected?._id
+
+    if (!id) {
+      setSaving(false)
+      msgApi.error('Prospect invalide (id manquant)')
+      return
+    }
+
     try {
-      setSaving(true)
-      const payload = buildPayloadFromForm(values)
-
-      const id = selected?._id
-      if (!id) throw new Error('Prospect invalide (id manquant)')
-
       if (!api?.leads?.update) {
         throw new Error("api.leads.update indisponible (branche l'endpoint update)")
       }
 
-      await api.leads.update(id, payload)
+      const res = await api.leads.update(id, payload)
+      const updated = unwrap(res)
+
       msgApi.success('Prospect mis à jour')
-      // recharge détail + liste
-      try {
-        const res = await api.leads.get(id)
-        const lead = unwrap(res)
-        setSelected(lead)
-        seedFormFromLead(lead)
-      } catch {}
+
+      // ✅ Optimiste : update selected + table sans dépendre d’un GET fragile
+      if (updated) {
+        setSelected((prev) => mergeLead(prev, updated))
+        setSeedTick((x) => x + 1)
+
+        setItems((prev) => {
+          const list = Array.isArray(prev) ? prev : []
+          return list.map((it) => (it?._id === id ? mergeLead(it, updated) : it))
+        })
+      } else {
+        setSelected((prev) => mergeLead(prev, { _id: id, ...payload }))
+        setSeedTick((x) => x + 1)
+
+        setItems((prev) => {
+          const list = Array.isArray(prev) ? prev : []
+          return list.map((it) => (it?._id === id ? mergeLead(it, { _id: id, ...payload }) : it))
+        })
+      }
+
       setMode('VIEW')
       load()
     } catch (e) {
-      msgApi.error(e?.response?.data?.error || e?.message || 'Mise à jour impossible')
+      const st = e?.response?.status
+
+      // ✅ cas courant: write OK, response KO (500) -> resync par GET
+      if (st === 500) {
+        try {
+          const fresh = await fetchLeadFresh(id, { retries: 1 })
+          if (fresh) {
+            setSelected((prev) => mergeLead(prev, fresh))
+            setSeedTick((x) => x + 1)
+
+            setItems((prev) => {
+              const list = Array.isArray(prev) ? prev : []
+              return list.map((it) => (it?._id === id ? mergeLead(it, fresh) : it))
+            })
+
+            setMode('VIEW')
+            msgApi.warning('Prospect mis à jour, mais réponse serveur instable (500). Données resynchronisées.')
+            setSaving(false)
+            return
+          }
+        } catch (_) {
+          // fallback erreur normale
+        }
+      }
+
+      if (isWarmingUpError(e)) msgApi.error('Service en démarrage, mise à jour à réessayer.')
+      else msgApi.error(e?.response?.data?.error || e?.message || 'Mise à jour impossible')
     } finally {
       setSaving(false)
     }
-  }, [load, msgApi, selected]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [load, msgApi, selected, fetchLeadFresh])
 
   // -------------------------
   // Columns responsive
   // -------------------------
-  const tableScrollX = { x: 'max-content' }
-
   const columnsMobile = [
     {
       title: 'Prospects',
@@ -555,7 +700,7 @@ export default function LeadsPage() {
                 style: { cursor: 'pointer' },
               })}
               columns={isMobile ? columnsMobile : columnsDesktop}
-              scroll={tableScrollX}
+              scroll={{ x: 'max-content' }}
               tableLayout="fixed"
               pagination={{
                 current: page,
@@ -583,6 +728,7 @@ export default function LeadsPage() {
                   {mode === 'CREATE' ? 'Nouveau prospect' : mode === 'EDIT' ? 'Modifier prospect' : 'Détails prospect'}
                 </Text>
                 {mode !== 'CREATE' && selected?.status ? statusPill(selected.status) : null}
+                {drawerLoading ? <Tag style={{ borderRadius: 999, marginInlineEnd: 0 }}>sync…</Tag> : null}
               </Space>
             }
             extra={
@@ -605,9 +751,17 @@ export default function LeadsPage() {
               ) : null
             }
           >
-            {drawerLoading ? <Text style={{ opacity: 0.75 }}>Chargement…</Text> : null}
-
             {!drawerLoading && mode !== 'CREATE' && !selected ? <Empty description="Aucun prospect sélectionné" /> : null}
+
+            {drawerLoading ? (
+              <Alert
+                type="info"
+                showIcon
+                message="Synchronisation"
+                description="On ouvre instantanément avec les données de la liste, puis on rafraîchit le détail en arrière-plan."
+                style={{ marginBottom: 12 }}
+              />
+            ) : null}
 
             {!drawerLoading ? (
               <Form
@@ -746,8 +900,9 @@ export default function LeadsPage() {
                       <Button
                         icon={<CloseOutlined />}
                         onClick={() => {
-                          // revert form to selected snapshot
-                          if (selected) seedFormFromLead(selected)
+                          if (selected) {
+                            setSeedTick((x) => x + 1) // reseed form depuis selected
+                          }
                           setMode('VIEW')
                         }}
                       >
