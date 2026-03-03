@@ -1,5 +1,5 @@
 // src/pages/invoices/InvoicesPage.jsx
-import React, { useContext, useEffect, useMemo, useState } from 'react'
+import React, { useContext, useEffect, useMemo, useState, useCallback } from 'react'
 import {
   App as AntApp,
   Button,
@@ -48,6 +48,7 @@ function n(v) {
   const x = Number(v)
   return Number.isFinite(x) ? x : 0
 }
+function unwrap(res) { return res?.data ?? res } // ✅ robust: axios response or plain json
 
 function moneyFmt(amount, currency) {
   const x = n(amount)
@@ -129,10 +130,13 @@ export default function InvoicesPage() {
     maxWidth: '100%',
   }
 
-  async function loadInvoices() {
+  const canCreateInvoice = hasAuth
+
+  const loadInvoices = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await api.invoices.list()
+      const res = await api.invoices.list()
+      const data = unwrap(res)
       const list = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : [])
       setItems(list)
     } catch (e) {
@@ -140,34 +144,66 @@ export default function InvoicesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [message])
 
-  async function loadContractsForPicker() {
+  const loadContractsForPicker = useCallback(async () => {
+    if (!hasAuth) {
+      message.error("Non autorisé. Connecte-toi pour charger les contrats.")
+      return
+    }
+
     setContractsLoading(true)
     try {
-      const data = await api.contracts.list({ limit: 200 })
+      if (!api?.contracts?.list) {
+        message.error("api.contracts.list(...) n'existe pas dans src/api/api.js")
+        return
+      }
+
+      const res = await api.contracts.list({ limit: 200 })
+      const data = unwrap(res)
       const list = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : [])
       setContracts(list)
+
+      if (!list.length) {
+        // petit hint UX : pas d’erreur, mais pas de contrats trouvés
+        message.info("Aucun contrat disponible (ou filtre côté backend).")
+      }
     } catch (e) {
-      message.error(e?.response?.data?.error || e?.message || 'Erreur chargement contrats')
+      const st = e?.response?.status
+      if (st === 401 || st === 403) {
+        message.error("Non autorisé. Connecte-toi pour accéder aux contrats.")
+      } else {
+        message.error(e?.response?.data?.error || e?.message || 'Erreur chargement contrats')
+      }
     } finally {
       setContractsLoading(false)
     }
-  }
+  }, [hasAuth, message])
 
-  async function loadContractsForListSilent() {
+  const loadContractsForListSilent = useCallback(async () => {
+    // ✅ ne pas spammer l’API si pas connecté
+    if (!hasAuth) return
     try {
-      const data = await api.contracts.list({ limit: 200 })
+      if (!api?.contracts?.list) return
+      const res = await api.contracts.list({ limit: 200 })
+      const data = unwrap(res)
       const list = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : [])
       setContracts(list)
-    } catch {}
-  }
+    } catch {
+      // silent
+    }
+  }, [hasAuth])
 
   useEffect(() => {
     loadInvoices()
     loadContractsForListSilent()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ✅ si l’utilisateur se connecte après coup, on recharge les contrats
+  useEffect(() => {
+    if (hasAuth) loadContractsForListSilent()
+  }, [hasAuth, loadContractsForListSilent])
 
   const contractsById = useMemo(() => {
     const m = new Map()
@@ -241,7 +277,8 @@ export default function InvoicesPage() {
     let c = findContractById(contractId)
     if (!c) {
       try {
-        c = await api.contracts.get(contractId)
+        const res = await api.contracts.get(contractId)
+        c = unwrap(res)
       } catch (e) {
         resetContractDerivedFields(contractId)
         message.error(e?.response?.data?.error || e?.message || 'Impossible de charger le contrat')
@@ -265,7 +302,9 @@ export default function InvoicesPage() {
     setDrawerOpen(true)
     form.resetFields()
     resetContractDerivedFields()
-    if (!contracts?.length) loadContractsForPicker()
+
+    // ✅ ne tente pas de charger si non connecté
+    if (hasAuth && !contracts?.length) loadContractsForPicker()
   }
 
   function onCloseCreate() {
@@ -275,12 +314,17 @@ export default function InvoicesPage() {
 
   async function submitCreate() {
     try {
+      if (!canCreateInvoice) {
+        return message.error("Non autorisé. Connecte-toi pour créer des factures.")
+      }
+
       const v = await form.validateFields()
       const contractId = safeStr(v.contractId)
       if (!contractId) return message.error('Veuillez sélectionner un contrat')
 
       setActionLoading(true)
-      const created = await api.invoices.create({ contractId, status: 'DRAFT' })
+      const res = await api.invoices.create({ contractId, status: 'DRAFT' })
+      const created = unwrap(res)
 
       message.success('Facture créée')
       setDrawerOpen(false)
@@ -679,6 +723,7 @@ export default function InvoicesPage() {
                     icon={<PlusOutlined />}
                     onClick={onOpenCreate}
                     style={{ borderRadius: 14 }}
+                    disabled={!canCreateInvoice}
                   >
                     Nouvelle facture
                   </Button>
@@ -748,6 +793,7 @@ export default function InvoicesPage() {
                           icon={<PlusOutlined />}
                           onClick={onOpenCreate}
                           style={{ borderRadius: 14 }}
+                          disabled={!canCreateInvoice}
                         >
                           Nouvelle facture
                         </Button>
@@ -778,7 +824,7 @@ export default function InvoicesPage() {
             extra={
               <Space>
                 <Button onClick={onCloseCreate} style={{ borderRadius: 14 }}>Annuler</Button>
-                <Button type="primary" onClick={submitCreate} loading={actionLoading} style={{ borderRadius: 14 }}>
+                <Button type="primary" onClick={submitCreate} loading={actionLoading} style={{ borderRadius: 14 }} disabled={!canCreateInvoice}>
                   Créer
                 </Button>
               </Space>
@@ -790,7 +836,7 @@ export default function InvoicesPage() {
                 showIcon
                 style={{ marginBottom: 12, borderRadius: 14 }}
                 message="Non connecté"
-                description="Connecte-toi pour créer une facture."
+                description="Connecte-toi pour charger les contrats et créer une facture."
               />
             ) : (
               <Alert
@@ -816,19 +862,31 @@ export default function InvoicesPage() {
                   rules={[{ required: true, message: 'Sélectionner un contrat' }]}
                 >
                   <Select
-                    placeholder="Choisir un contrat"
+                    placeholder={hasAuth ? 'Choisir un contrat' : 'Connecte-toi pour voir les contrats'}
                     loading={contractsLoading}
                     options={contractOptions}
                     showSearch
+                    disabled={!hasAuth}
                     filterOption={(input, option) =>
                       String(option?.label || '').toLowerCase().includes(String(input || '').toLowerCase())
                     }
                     onDropdownVisibleChange={(open) => {
+                      if (!hasAuth) return
                       if (open && !contracts?.length) loadContractsForPicker()
                     }}
                     onChange={onContractChange}
                   />
                 </Form.Item>
+
+                {!contractsLoading && hasAuth && !contracts?.length ? (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    style={{ marginBottom: 12, borderRadius: 14 }}
+                    message="Aucun contrat"
+                    description="Aucun contrat n’a été trouvé. Vérifie que des contrats existent et que l’API /contracts les renvoie pour ton rôle/tenant."
+                  />
+                ) : null}
 
                 <Row gutter={12}>
                   <Col span={24}>
